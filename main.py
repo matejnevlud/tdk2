@@ -27,7 +27,7 @@ from ftp_server import (
 PLC_IP = "192.168.11.1"
 PLC_RACK = 0
 PLC_SLOT = 1
-POLL_INTERVAL = 10  # seconds
+POLL_INTERVAL = 4  # seconds
 FTP_PORT = 21
 BASE_DIR = "X:\\"
 
@@ -84,7 +84,16 @@ def poll_loop(client):
             time.sleep(0.1)
 
 
+LOGO = """
+  ＮＥＶＬＵＤ
+  Ｉｎｄｕｓｔｒｉｅｓ
+
+  TDK2 Traceability System v0.1.0
+"""
+
+
 def main():
+    print(LOGO)
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
