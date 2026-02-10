@@ -4,6 +4,7 @@ Monitors a shared camera image folder and polls a Siemens PLC (DB90)
 for measurement data, organizing everything by date and EAN code.
 """
 
+import configparser
 import logging
 import os
 import signal
@@ -22,12 +23,51 @@ from camera_images import (
 )
 
 # ── Configuration ──────────────────────────────────────────────────────
-PLC_IP = "192.168.11.1"
-PLC_RACK = 0
-PLC_SLOT = 1
-POLL_INTERVAL = 1  # seconds
-CAMERA_DIR = "C:\\Users\\TDK\\Desktop\\TDK2-Traceability-Portable-2\\ftp_incoming"
-BASE_DIR = "X:\\"
+# Resolve config.ini next to the exe (or script) so it works after PyInstaller build
+if getattr(sys, "frozen", False):
+    _APP_DIR = os.path.dirname(sys.executable)
+else:
+    _APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
+CONFIG_PATH = os.path.join(_APP_DIR, "config.ini")
+
+DEFAULTS = {
+    "plc_ip": "192.168.11.1",
+    "plc_rack": "0",
+    "plc_slot": "1",
+    "poll_interval": "4",
+    "camera_dir": r"C:\\Users\\TDK\Desktop\\TDK2-Traceability-Portable-2\\ftp_incoming",
+    "base_dir": r"X:\\",
+}
+
+
+def load_config(path: str) -> configparser.ConfigParser:
+    """Load config.ini, creating it with defaults if it doesn't exist."""
+    config = configparser.ConfigParser()
+    config["DEFAULT"] = DEFAULTS
+
+    if os.path.isfile(path):
+        config.read(path, encoding="utf-8")
+    else:
+        # Create the file so the user can edit it
+        config["tdk2"] = {}
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("# TDK2 Traceability Configuration\n")
+            f.write("# Edit values below and restart the application.\n\n")
+            config.write(f)
+
+    return config
+
+
+_cfg = load_config(CONFIG_PATH)
+_sec = _cfg["tdk2"] if _cfg.has_section("tdk2") else _cfg["DEFAULT"]
+
+PLC_IP = _sec.get("plc_ip")
+PLC_RACK = _sec.getint("plc_rack")
+PLC_SLOT = _sec.getint("plc_slot")
+POLL_INTERVAL = _sec.getfloat("poll_interval")
+CAMERA_DIR = _sec.get("camera_dir")
+BASE_DIR = _sec.get("base_dir")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -60,38 +100,13 @@ def poll_loop(client):
                 logger.info("Data saved to %s/data.csv", folder)
 
                 # Match and copy camera images for positions 1-3
-                logger.info(
-                    "Starting camera image matching for EAN=%s, dest='%s'",
-                    current_ean,
-                    folder,
-                )
                 for pos in range(1, 4):
                     pos_ts = record["positions"][pos - 1]["timestamp"]
                     if pos_ts is None:
-                        logger.info(
-                            "Position %d: no PLC timestamp available, skipping image match",
-                            pos,
-                        )
                         continue
-                    logger.info(
-                        "Position %d: PLC timestamp = %s, searching in '%s'",
-                        pos,
-                        pos_ts.strftime("%Y-%m-%d %H:%M:%S.%f"),
-                        CAMERA_DIR,
-                    )
                     cam_dir = find_closest_camera_dir(pos_ts, CAMERA_DIR)
                     if cam_dir:
-                        count = copy_position_image(cam_dir, pos, folder)
-                        if count:
-                            logger.info("Position %d: %d image(s) copied successfully", pos, count)
-                        else:
-                            logger.warning("Position %d: matched dir but no POZ%d image found", pos, pos)
-                    else:
-                        logger.warning(
-                            "Position %d: no camera directory matched for timestamp %s",
-                            pos,
-                            pos_ts.strftime("%Y-%m-%d %H:%M:%S.%f"),
-                        )
+                        copy_position_image(cam_dir, pos, folder)
 
                 last_ean = current_ean
 
@@ -119,6 +134,7 @@ def main():
     signal.signal(signal.SIGTERM, handle_signal)
 
     logger.info("Starting TDK2 Traceability Application")
+    logger.info("Config file: %s", CONFIG_PATH)
 
     # Check output directory is accessible
     if not os.path.isdir(BASE_DIR):

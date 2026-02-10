@@ -44,57 +44,29 @@ def find_closest_camera_dir(plc_timestamp: datetime, camera_dir: str) -> str | N
         logger.warning("Camera directory does not exist: %s", camera_dir)
         return None
 
-    all_entries = os.listdir(camera_dir)
-    logger.info(
-        "Scanning camera dir '%s' for PLC timestamp %s — found %d entries",
-        camera_dir,
-        plc_timestamp.strftime("%Y-%m-%d %H:%M:%S.%f"),
-        len(all_entries),
-    )
-
     best_path = None
     best_delta = None
-    parsed_count = 0
 
-    for entry in all_entries:
+    for entry in os.listdir(camera_dir):
         entry_path = os.path.join(camera_dir, entry)
         if not os.path.isdir(entry_path):
             continue
         dir_dt = parse_camera_dir_name(entry)
         if dir_dt is None:
-            logger.info("  Skipping entry '%s' — cannot parse as timestamp", entry)
             continue
-        parsed_count += 1
         delta = abs((dir_dt - plc_timestamp).total_seconds())
-        logger.info(
-            "  Dir '%s' -> %s  delta=%.4fs",
-            entry,
-            dir_dt.strftime("%Y-%m-%d %H:%M:%S.%f"),
-            delta,
-        )
         if best_delta is None or delta < best_delta:
             best_delta = delta
             best_path = entry_path
 
     if best_path is not None:
         logger.info(
-            "  BEST MATCH: '%s' (delta=%.4fs) for PLC timestamp %s",
+            "Matched dir '%s' (delta=%.3fs)",
             os.path.basename(best_path),
             best_delta,
-            plc_timestamp.strftime("%Y-%m-%d %H:%M:%S.%f"),
         )
-        # Log contents of matched dir
-        contents = os.listdir(best_path)
-        logger.info("  Matched dir contains %d files: %s", len(contents), contents)
     else:
-        logger.warning(
-            "No matching camera dir found! Scanned %d entries, %d parseable dirs, "
-            "PLC timestamp=%s, camera_dir='%s'",
-            len(all_entries),
-            parsed_count,
-            plc_timestamp.strftime("%Y-%m-%d %H:%M:%S.%f"),
-            camera_dir,
-        )
+        logger.warning("No camera dir matched for timestamp %s", plc_timestamp)
 
     return best_path
 
@@ -110,39 +82,23 @@ def copy_position_image(camera_folder: str, position: int, dest_folder: str) -> 
     images_dir = os.path.join(dest_folder, "images")
     os.makedirs(images_dir, exist_ok=True)
 
-    all_files = os.listdir(camera_folder)
-    logger.info(
-        "Looking for '%s*' in '%s' (%d files: %s)",
-        prefix,
-        camera_folder,
-        len(all_files),
-        all_files,
-    )
-
     copied = 0
-    for filename in all_files:
+    for filename in os.listdir(camera_folder):
         if filename.startswith(prefix) and os.path.isfile(
             os.path.join(camera_folder, filename)
         ):
-            src = os.path.join(camera_folder, filename)
-            dst = os.path.join(images_dir, filename)
-            shutil.copy2(src, dst)
-            os.remove(src)
-            logger.info(
-                "Moved POZ%d image: '%s' -> '%s'", position, src, dst
+            shutil.copy2(
+                os.path.join(camera_folder, filename),
+                os.path.join(images_dir, filename),
             )
+            os.remove(os.path.join(camera_folder, filename))
+            logger.info("Moved %s", filename)
             copied += 1
 
     if copied == 0:
-        logger.warning(
-            "No file with prefix '%s' found in '%s'. Available files: %s",
-            prefix,
-            camera_folder,
-            all_files,
-        )
+        logger.warning("No POZ%d file found in %s", position, os.path.basename(camera_folder))
 
     if copied > 0 and not os.listdir(camera_folder):
         os.rmdir(camera_folder)
-        logger.info("Deleted empty camera folder: '%s'", camera_folder)
 
     return copied

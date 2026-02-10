@@ -31,6 +31,7 @@ a = Analysis(
         'snap7.client',
         'snap7.util',
         'snap7.type',
+        'configparser',
         'struct',
         'threading',
         'csv',
