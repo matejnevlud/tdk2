@@ -1,0 +1,56 @@
+name: Build Windows Package
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'main.py'
+      - 'plc_reader.py'
+      - 'ftp_server.py'
+      - 'build.spec'
+      - 'build_windows.py'
+      - '.github/workflows/build-windows.yml'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+
+    - name: Install uv
+      run: |
+        powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+    - name: Install dependencies
+      run: |
+        uv sync
+        uv pip install pyinstaller
+
+    - name: Build Windows package
+      run: |
+        uv run python build_windows.py
+
+    - name: Upload Windows package artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: TDK2-Traceability-Windows-Portable
+        path: dist/TDK2-Traceability-Portable.zip
+        retention-days: 90
+
+    - name: Upload build log
+      uses: actions/upload-artifact@v4
+      if: failure()
+      with:
+        name: build-log
+        path: build/
+        retention-days: 7
