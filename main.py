@@ -81,9 +81,9 @@ def poll_loop(client):
                     )
                     cam_dir = find_closest_camera_dir(pos_ts, CAMERA_DIR)
                     if cam_dir:
-                        copied = copy_position_image(cam_dir, pos, folder)
-                        if copied:
-                            logger.info("Position %d: image copied successfully", pos)
+                        count = copy_position_image(cam_dir, pos, folder)
+                        if count:
+                            logger.info("Position %d: %d image(s) copied successfully", pos, count)
                         else:
                             logger.warning("Position %d: matched dir but no POZ%d image found", pos, pos)
                     else:

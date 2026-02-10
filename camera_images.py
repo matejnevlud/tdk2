@@ -99,12 +99,13 @@ def find_closest_camera_dir(plc_timestamp: datetime, camera_dir: str) -> str | N
     return best_path
 
 
-def copy_position_image(camera_folder: str, position: int, dest_folder: str) -> bool:
-    """Find and copy the POZ<position>_ image from camera_folder to dest_folder/images/.
+def copy_position_image(camera_folder: str, position: int, dest_folder: str) -> int:
+    """Find and copy all POZ<position> images from camera_folder to dest_folder/images/.
 
-    Returns True if an image was found and copied, False otherwise.
+    Matches filenames starting with 'POZ<position>' (e.g. POZ3_, POZ3a_, POZ3b_).
+    Returns the number of files copied.
     """
-    prefix = f"POZ{position}_"
+    prefix = f"POZ{position}"
     images_dir = os.path.join(dest_folder, "images")
     os.makedirs(images_dir, exist_ok=True)
 
@@ -117,6 +118,7 @@ def copy_position_image(camera_folder: str, position: int, dest_folder: str) -> 
         all_files,
     )
 
+    copied = 0
     for filename in all_files:
         if filename.startswith(prefix) and os.path.isfile(
             os.path.join(camera_folder, filename)
@@ -127,12 +129,14 @@ def copy_position_image(camera_folder: str, position: int, dest_folder: str) -> 
             logger.info(
                 "Copied POZ%d image: '%s' -> '%s'", position, src, dst
             )
-            return True
+            copied += 1
 
-    logger.warning(
-        "No file with prefix '%s' found in '%s'. Available files: %s",
-        prefix,
-        camera_folder,
-        all_files,
-    )
-    return False
+    if copied == 0:
+        logger.warning(
+            "No file with prefix '%s' found in '%s'. Available files: %s",
+            prefix,
+            camera_folder,
+            all_files,
+        )
+
+    return copied
