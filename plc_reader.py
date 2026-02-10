@@ -105,7 +105,7 @@ def save_to_csv(record: dict, base_dir: str = "measurements") -> str:
     safe_ean = safe_ean.replace("<", "_").replace(">", "_").replace("|", "_")
     folder = os.path.join(base_dir, today, safe_ean)
     os.makedirs(folder, exist_ok=True)
-    csv_path = os.path.join(folder, "data.csv")
+    csv_path = os.path.join(folder, f"{safe_ean}.csv")
 
     file_exists = os.path.isfile(csv_path)
 

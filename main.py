@@ -29,7 +29,7 @@ PLC_RACK = 0
 PLC_SLOT = 1
 POLL_INTERVAL = 10  # seconds
 FTP_PORT = 21
-BASE_DIR = "measurements"
+BASE_DIR = "X:\\"
 
 logging.basicConfig(
     level=logging.INFO,
