@@ -25,7 +25,7 @@ from camera_images import (
 PLC_IP = "192.168.11.1"
 PLC_RACK = 0
 PLC_SLOT = 1
-POLL_INTERVAL = 4  # seconds
+POLL_INTERVAL = 1  # seconds
 CAMERA_DIR = "C:\\Users\\TDK\\Desktop\\TDK2-Traceability-Portable-2\\ftp_incoming"
 BASE_DIR = "X:\\"
 
