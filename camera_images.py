@@ -100,10 +100,11 @@ def find_closest_camera_dir(plc_timestamp: datetime, camera_dir: str) -> str | N
 
 
 def copy_position_image(camera_folder: str, position: int, dest_folder: str) -> int:
-    """Find and copy all POZ<position> images from camera_folder to dest_folder/images/.
+    """Move all POZ<position> images from camera_folder to dest_folder/images/.
 
     Matches filenames starting with 'POZ<position>' (e.g. POZ3_, POZ3a_, POZ3b_).
-    Returns the number of files copied.
+    The source file is deleted after a successful copy.
+    Returns the number of files moved.
     """
     prefix = f"POZ{position}"
     images_dir = os.path.join(dest_folder, "images")
@@ -126,8 +127,9 @@ def copy_position_image(camera_folder: str, position: int, dest_folder: str) -> 
             src = os.path.join(camera_folder, filename)
             dst = os.path.join(images_dir, filename)
             shutil.copy2(src, dst)
+            os.remove(src)
             logger.info(
-                "Copied POZ%d image: '%s' -> '%s'", position, src, dst
+                "Moved POZ%d image: '%s' -> '%s'", position, src, dst
             )
             copied += 1
 
@@ -138,5 +140,9 @@ def copy_position_image(camera_folder: str, position: int, dest_folder: str) -> 
             camera_folder,
             all_files,
         )
+
+    if copied > 0 and not os.listdir(camera_folder):
+        os.rmdir(camera_folder)
+        logger.info("Deleted empty camera folder: '%s'", camera_folder)
 
     return copied
