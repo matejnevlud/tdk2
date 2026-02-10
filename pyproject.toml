@@ -1,10 +1,9 @@
 [project]
 name = "tdk2-traceability"
 version = "0.1.0"
-description = "PLC Traceability & FTP Image Archiving Application"
+description = "PLC Traceability & Camera Image Archiving Application"
 requires-python = ">=3.10"
 dependencies = [
-    "pyftpdlib>=2.2.0",
     "python-snap7>=2.0.2",
 ]
 

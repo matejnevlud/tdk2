@@ -1,26 +1,24 @@
 """Entry point for the TDK2 traceability application.
 
-Starts an FTP server for camera images and polls a Siemens PLC (DB90)
+Monitors a shared camera image folder and polls a Siemens PLC (DB90)
 for measurement data, organizing everything by date and EAN code.
 """
 
 import logging
+import os
 import signal
 import sys
 import time
 
 from plc_reader import (
     connect_plc,
-    format_timestamp_for_match,
     parse_db90,
     read_db90,
     save_to_csv,
 )
-from ftp_server import (
-    FTP_ROOT,
-    copy_images,
-    find_matching_images,
-    start_ftp_server,
+from camera_images import (
+    copy_position_image,
+    find_closest_camera_dir,
 )
 
 # ── Configuration ──────────────────────────────────────────────────────
@@ -28,7 +26,7 @@ PLC_IP = "192.168.11.1"
 PLC_RACK = 0
 PLC_SLOT = 1
 POLL_INTERVAL = 4  # seconds
-FTP_PORT = 21
+CAMERA_DIR = "C:\\Users\\TDK\\Desktop\\TDK2-Traceability-Portable-2\\ftp_incoming"
 BASE_DIR = "X:\\"
 
 logging.basicConfig(
@@ -61,16 +59,39 @@ def poll_loop(client):
                 folder = save_to_csv(record, base_dir=BASE_DIR)
                 logger.info("Data saved to %s/data.csv", folder)
 
-                # Try to match and copy camera images by Pos.1 timestamp
-                pos1_ts = record["positions"][0]["timestamp"]
-                ts_str = format_timestamp_for_match(pos1_ts)
-                if ts_str:
-                    img_dir = find_matching_images(ts_str, ftp_root=FTP_ROOT)
-                    if img_dir:
-                        count = copy_images(img_dir, folder)
-                        logger.info("Matched %d images for EAN %s", count, current_ean)
+                # Match and copy camera images for positions 1-3
+                logger.info(
+                    "Starting camera image matching for EAN=%s, dest='%s'",
+                    current_ean,
+                    folder,
+                )
+                for pos in range(1, 4):
+                    pos_ts = record["positions"][pos - 1]["timestamp"]
+                    if pos_ts is None:
+                        logger.info(
+                            "Position %d: no PLC timestamp available, skipping image match",
+                            pos,
+                        )
+                        continue
+                    logger.info(
+                        "Position %d: PLC timestamp = %s, searching in '%s'",
+                        pos,
+                        pos_ts.strftime("%Y-%m-%d %H:%M:%S.%f"),
+                        CAMERA_DIR,
+                    )
+                    cam_dir = find_closest_camera_dir(pos_ts, CAMERA_DIR)
+                    if cam_dir:
+                        copied = copy_position_image(cam_dir, pos, folder)
+                        if copied:
+                            logger.info("Position %d: image copied successfully", pos)
+                        else:
+                            logger.warning("Position %d: matched dir but no POZ%d image found", pos, pos)
                     else:
-                        logger.debug("No FTP images found for timestamp %s", ts_str)
+                        logger.warning(
+                            "Position %d: no camera directory matched for timestamp %s",
+                            pos,
+                            pos_ts.strftime("%Y-%m-%d %H:%M:%S.%f"),
+                        )
 
                 last_ean = current_ean
 
@@ -98,11 +119,20 @@ def main():
     signal.signal(signal.SIGTERM, handle_signal)
 
     logger.info("Starting TDK2 Traceability Application")
-    logger.info("PLC: %s (rack=%d, slot=%d, DB90)", PLC_IP, PLC_RACK, PLC_SLOT)
 
-    # Start FTP server
-    ftp_server = start_ftp_server(port=FTP_PORT)
-    logger.info("FTP server running on port %d", FTP_PORT)
+    # Check output directory is accessible
+    if not os.path.isdir(BASE_DIR):
+        logger.error("Output directory %s does not exist or is not accessible!", BASE_DIR)
+        sys.exit(1)
+
+    # Check camera directory exists
+    if not os.path.isdir(CAMERA_DIR):
+        logger.error("Camera directory %s does not exist or is not accessible!", CAMERA_DIR)
+        sys.exit(1)
+
+    logger.info("Output directory: %s", BASE_DIR)
+    logger.info("Camera directory: %s", CAMERA_DIR)
+    logger.info("PLC: %s (rack=%d, slot=%d, DB90)", PLC_IP, PLC_RACK, PLC_SLOT)
 
     # Connect to PLC
     try:
@@ -110,7 +140,6 @@ def main():
         logger.info("Connected to PLC at %s", PLC_IP)
     except Exception:
         logger.exception("Failed to connect to PLC at %s", PLC_IP)
-        ftp_server.close_all()
         sys.exit(1)
 
     # Run polling loop
@@ -119,7 +148,6 @@ def main():
     finally:
         logger.info("Shutting down...")
         client.disconnect()
-        ftp_server.close_all()
         logger.info("Shutdown complete")
 
 

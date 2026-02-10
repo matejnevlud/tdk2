@@ -77,13 +77,6 @@ def format_timestamp(dt: datetime | None) -> str:
     return dt.strftime("%Y-%m-%d %H:%M:%S.%f")
 
 
-def format_timestamp_for_match(dt: datetime | None) -> str:
-    """Format timestamp for matching with FTP directory names."""
-    if dt is None:
-        return ""
-    return dt.strftime("%Y-%m-%d_%H-%M-%S")
-
-
 CSV_HEADER = (
     ["timestamp", "id", "presence", "result_total", "ean"]
     + [f"ljs_{i}" for i in range(1, 64)]
