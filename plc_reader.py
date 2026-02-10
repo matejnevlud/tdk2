@@ -99,7 +99,11 @@ def save_to_csv(record: dict, base_dir: str = "measurements") -> str:
     """Save a parsed DB90 record to CSV. Returns the folder path used."""
     today = datetime.now().strftime("%Y-%m-%d")
     ean = record["ean"] or "UNKNOWN"
-    folder = os.path.join(base_dir, today, ean)
+    # Replace characters illegal in Windows directory names: \ / : * ? " < > |
+    safe_ean = ean.replace(":", "_").replace("\\", "_").replace("/", "_")
+    safe_ean = safe_ean.replace("*", "_").replace("?", "_").replace('"', "_")
+    safe_ean = safe_ean.replace("<", "_").replace(">", "_").replace("|", "_")
+    folder = os.path.join(base_dir, today, safe_ean)
     os.makedirs(folder, exist_ok=True)
     csv_path = os.path.join(folder, "data.csv")
 
